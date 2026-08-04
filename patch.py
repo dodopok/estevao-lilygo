@@ -8,6 +8,8 @@ if TYPE_CHECKING:
 
 import glob
 import gzip
+import shlex
+import sys
 from os import makedirs, remove, rename
 from os.path import basename, dirname, exists, isfile, join
 
@@ -18,6 +20,12 @@ board_mcu = env.BoardConfig()
 mcu = board_mcu.get("build.mcu", "")
 patchflag_path = join(FRAMEWORK_DIR,mcu, "lib", ".patched")
 
+
+def pio_pkg_exec(package, executable, *arguments):
+    command = [sys.executable, "-m", "platformio", "pkg", "exec", "-p", package, "--", executable]
+    command.extend(arguments)
+    return env.Execute(" ".join(shlex.quote(str(part)) for part in command))
+
 # patch file only if we didn't do it befored
 if not isfile(join(FRAMEWORK_DIR,mcu, "lib", ".patched")):
     original_file = join(FRAMEWORK_DIR,mcu, "lib", "libnet80211.a")
@@ -26,16 +34,22 @@ if not isfile(join(FRAMEWORK_DIR,mcu, "lib", ".patched")):
     )
 
     if mcu=="esp32c5" or mcu=="esp32c6" :
-        env.Execute(
-            "pio pkg exec -p toolchain-riscv32-esp -- riscv32-esp-elf-objcopy  --weaken-symbol=ieee80211_raw_frame_sanity_check %s %s"
-            % (original_file, patched_file)
+        pio_pkg_exec(
+            "toolchain-riscv32-esp",
+            "riscv32-esp-elf-objcopy",
+            "--weaken-symbol=ieee80211_raw_frame_sanity_check",
+            original_file,
+            patched_file,
         )
     elif mcu=="esp32p4":
         """Do nothing"""
     else:
-        env.Execute(
-            "pio pkg exec -p toolchain-xtensa-%s -- xtensa-%s-elf-objcopy  --weaken-symbol=ieee80211_raw_frame_sanity_check %s %s"
-            % (mcu, mcu, original_file, patched_file)
+        pio_pkg_exec(
+            "toolchain-xtensa-%s" % mcu,
+            "xtensa-%s-elf-objcopy" % mcu,
+            "--weaken-symbol=ieee80211_raw_frame_sanity_check",
+            original_file,
+            patched_file,
         )
 
     if isfile("%s.old" % (original_file)):

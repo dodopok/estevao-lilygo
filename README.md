@@ -17,6 +17,7 @@ que atende `POST /api/v1/assistant/ask`.
 - Ambiente alvo: `lilygo-t-embed-cc1101`.
 - O upstream do Bruce está documentado em [`docs/UPSTREAM.md`](docs/UPSTREAM.md).
 - O contrato esperado do serviço de IA está em [`docs/ASSISTANT_API.md`](docs/ASSISTANT_API.md).
+- O guia de implementação da gateway está em [`docs/ASSISTANT_GATEWAY.md`](docs/ASSISTANT_GATEWAY.md).
 
 ## Build
 

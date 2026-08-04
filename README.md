@@ -21,6 +21,19 @@ Para uma instalação multiusuário, a ponte opcional está descrita em
 - O contrato da integração OpenAI + MCP está em [`docs/ASSISTANT_API.md`](docs/ASSISTANT_API.md).
 - A evolução para uma ponte autenticada está em [`docs/ASSISTANT_GATEWAY.md`](docs/ASSISTANT_GATEWAY.md).
 
+## Atualizar o Bruce
+
+O remote `upstream` aponta para o repositório oficial do Bruce. Para buscar e
+incorporar novas alterações, mantenha a árvore limpa e execute:
+
+```bash
+./scripts/update-bruce.sh
+```
+
+O script exige o branch `main`, preserva os commits locais em um merge e não
+faz push automaticamente. Se houver conflitos, resolva-os antes de validar o
+firmware e publicar em `origin`.
+
 ## Build
 
 ```bash

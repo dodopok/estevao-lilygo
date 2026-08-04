@@ -1,5 +1,6 @@
 #include "estevao_client.h"
 
+#include "estevao_ca.h"
 #include "estevao_storage.h"
 
 #include <ArduinoJson.h>
@@ -32,6 +33,14 @@ String statusError(int status) {
         case 503: return "Serviço temporariamente indisponível";
         default: return "HTTP " + String(status);
     }
+}
+
+const char *caCertificate(String &overrideCertificate) {
+    if (EstevaoStorage::loadText(EstevaoStorage::CA_PATH, overrideCertificate, 8192) &&
+        overrideCertificate.startsWith("-----BEGIN CERTIFICATE-----")) {
+        return overrideCertificate.c_str();
+    }
+    return ESTEVAO_ROOT_CA;
 }
 
 bool validDate(const String &date) {
@@ -118,15 +127,11 @@ EstevaoResponse EstevaoClient::requestJson(const char *method, const String &pat
         return response;
     }
 
-    String caCertificate;
-    if (!EstevaoStorage::loadText(EstevaoStorage::CA_PATH, caCertificate, 8192)) {
-        response.error = "Certificado CA ausente em /estevao/ca.pem";
-        return response;
-    }
+    String caOverride;
 
     WiFiClientSecure secureClient;
     secureClient.setTimeout(HTTP_TIMEOUT_MS);
-    secureClient.setCACert(caCertificate.c_str());
+    secureClient.setCACert(caCertificate(caOverride));
 
     HTTPClient http;
     http.setTimeout(HTTP_TIMEOUT_MS);
@@ -195,16 +200,11 @@ EstevaoResponse EstevaoClient::requestAudio(const String &path, FS *fs, const St
         return response;
     }
 
-    String caCertificate;
-    if (!EstevaoStorage::loadText(EstevaoStorage::CA_PATH, caCertificate, 8192)) {
-        audioFile.close();
-        response.error = "Certificado CA ausente em /estevao/ca.pem";
-        return response;
-    }
+    String caOverride;
 
     WiFiClientSecure secureClient;
     secureClient.setTimeout(HTTP_TIMEOUT_MS);
-    secureClient.setCACert(caCertificate.c_str());
+    secureClient.setCACert(caCertificate(caOverride));
 
     HTTPClient http;
     http.setTimeout(HTTP_TIMEOUT_MS);

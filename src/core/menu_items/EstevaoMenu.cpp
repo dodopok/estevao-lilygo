@@ -518,8 +518,8 @@ void EstevaoMenu::settingsMenu() {
              EstevaoStorage::saveConfig(_config);
              settingsMenu();
          }},
-        {"Certificado CA", []() {
-             displayInfo("Envie /estevao/ca.pem pelo WebUI", true);
+        {"HTTPS: CA embutida", []() {
+             displayInfo("CA incluida no firmware\nOverride opcional: /estevao/ca.pem", true);
          }},
         {"Salvar e voltar", [this]() {
              EstevaoStorage::saveConfig(_config);

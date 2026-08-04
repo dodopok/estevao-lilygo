@@ -25,7 +25,6 @@ private:
     void loadConfig();
     EstevaoClient client() const;
 
-    void todayMenu();
     void showToday();
     void showCollect();
     void commemorationsMenu();
@@ -43,6 +42,9 @@ private:
     bool loadExplanation(bool refresh, String &payload, String &error);
     void showText(const String &title, const String &text, size_t maxBytes = 14000);
     void showResponseError(const String &error);
+
+    String _calendarDate;
+    String _calendarPayload;
 };
 
 #endif

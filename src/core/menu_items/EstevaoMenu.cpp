@@ -24,6 +24,7 @@ String variantText(JsonVariant value) {
 }
 
 String fieldText(JsonVariant object, const char *first, const char *second = nullptr) {
+    if (!object.is<JsonObject>()) return "";
     String value = variantText(object[first]);
     if (value.length() == 0 && second != nullptr) value = variantText(object[second]);
     return value;
@@ -54,7 +55,7 @@ String answerText(const String &payload) {
     if (answer.length() == 0) answer = variantText(doc["message"]);
     if (answer.length() == 0) answer = variantText(doc["text"]);
     if (answer.length() == 0) answer = variantText(doc["output_text"]);
-    if (answer.length() == 0 && !doc["data"].isNull()) answer = variantText(doc["data"]["answer"]);
+    if (answer.length() == 0 && doc["data"].is<JsonObject>()) answer = variantText(doc["data"]["answer"]);
     return answer.length() > 0 ? answer : payload;
 }
 
@@ -130,12 +131,35 @@ bool EstevaoMenu::loadCalendar(bool refresh, String &date, String &payload, Stri
     error = "";
 
     String requestedDate = EstevaoClient::todayDate();
+
+    if (!refresh && _calendarPayload.length() > 0 &&
+        (requestedDate.length() == 0 || _calendarDate == requestedDate)) {
+        date = _calendarDate;
+        payload = _calendarPayload;
+        return true;
+    }
+
+    if (!refresh) {
+        String cachedDate;
+        String cachedPayload;
+        if (EstevaoStorage::loadCalendar(cachedDate, cachedPayload) &&
+            (requestedDate.length() == 0 || cachedDate == requestedDate)) {
+            _calendarDate = cachedDate;
+            _calendarPayload = cachedPayload;
+            date = cachedDate;
+            payload = cachedPayload;
+            return true;
+        }
+    }
+
     if (refresh && requestedDate.length() > 0 && _config.hasCredentials()) {
         EstevaoResponse response = client().getCalendar(requestedDate);
         if (response.ok && response.body.length() > 0) {
             if (!EstevaoStorage::saveCalendar(requestedDate, response.body)) {
                 Serial.println("WARN: não foi possível salvar o cache do calendário");
             }
+            _calendarDate = requestedDate;
+            _calendarPayload = response.body;
             date = requestedDate;
             payload = response.body;
             return true;
@@ -143,7 +167,18 @@ bool EstevaoMenu::loadCalendar(bool refresh, String &date, String &payload, Stri
         error = response.error;
     }
 
-    if (EstevaoStorage::loadCalendar(date, payload)) return true;
+    if (_calendarPayload.length() > 0 &&
+        (requestedDate.length() == 0 || _calendarDate == requestedDate)) {
+        date = _calendarDate;
+        payload = _calendarPayload;
+        return true;
+    }
+
+    if (EstevaoStorage::loadCalendar(date, payload)) {
+        _calendarDate = date;
+        _calendarPayload = payload;
+        return true;
+    }
     if (error.length() == 0) {
         error = requestedDate.length() == 0 ? "Relógio ainda não sincronizado" : "Nenhum calendário salvo";
     }
@@ -180,19 +215,6 @@ void EstevaoMenu::showResponseError(const String &error) {
     displayError(error.length() > 0 ? error : "Não foi possível consultar o Estêvão", true);
 }
 
-void EstevaoMenu::todayMenu() {
-    options = {
-        {"Atualizar", [this]() { showToday(); }},
-        {"Usar cache", [this]() {
-             String date, payload, error;
-             if (loadCalendar(false, date, payload, error)) showText("Estêvão | " + date, payload);
-             else showResponseError(error);
-         }},
-        {"Voltar", []() {}},
-    };
-    loopOptions(options, MENU_TYPE_SUBMENU, "Hoje");
-}
-
 void EstevaoMenu::showToday() {
     String date, payload, error;
     if (!loadCalendar(true, date, payload, error)) {
@@ -215,6 +237,8 @@ void EstevaoMenu::showToday() {
     addLabeledLine(area, "Ano litúrgico", documentField(doc, "liturgical_year"));
     addLabeledLine(area, "Domingo", documentField(doc, "sunday_name"));
     addLabeledLine(area, "Semana", documentField(doc, "week_of_season", "proper_week"));
+    addLabeledLine(area, "É domingo", documentField(doc, "is_sunday"));
+    addLabeledLine(area, "É dia santo", documentField(doc, "is_holy_day"));
 
     JsonVariant celebration = doc["celebration"];
     String celebrationName = fieldText(celebration, "name", "title");
@@ -233,7 +257,7 @@ void EstevaoMenu::showToday() {
 
 void EstevaoMenu::showCollect() {
     String date, payload, error;
-    if (!loadCalendar(true, date, payload, error)) {
+    if (!loadCalendar(false, date, payload, error)) {
         showResponseError(error);
         return;
     }
@@ -270,7 +294,7 @@ void EstevaoMenu::commemorationsMenu() {
 
 void EstevaoMenu::showCommemorations() {
     String date, payload, error;
-    if (!loadCalendar(true, date, payload, error)) {
+    if (!loadCalendar(false, date, payload, error)) {
         showResponseError(error);
         return;
     }
@@ -312,7 +336,7 @@ void EstevaoMenu::readingsMenu() {
 
 void EstevaoMenu::showReadingSet(const char *title, const char *jsonKey) {
     String date, payload, error;
-    if (!loadCalendar(true, date, payload, error)) {
+    if (!loadCalendar(false, date, payload, error)) {
         showResponseError(error);
         return;
     }
@@ -499,6 +523,7 @@ void EstevaoMenu::settingsMenu() {
          }},
         {"Salvar e voltar", [this]() {
              EstevaoStorage::saveConfig(_config);
+             backToMenu();
          }},
     };
     addOptionToMainMenu();

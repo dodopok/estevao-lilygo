@@ -35,7 +35,13 @@ String statusError(int status) {
 }
 
 bool validDate(const String &date) {
-    return date.length() == 10 && date.charAt(4) == '-' && date.charAt(7) == '-';
+    if (date.length() != 10 || date.charAt(4) != '-' || date.charAt(7) != '-') return false;
+
+    for (size_t i = 0; i < date.length(); i++) {
+        if (i == 4 || i == 7) continue;
+        if (date.charAt(i) < '0' || date.charAt(i) > '9') return false;
+    }
+    return true;
 }
 
 } // namespace
@@ -82,7 +88,9 @@ String EstevaoClient::buildCalendarPath(const String &date) const {
 }
 
 String EstevaoClient::buildExplanationPath(const String &date) const {
-    return "/api/v1/liturgical_explanation/" + datePath(date);
+    String path = "/api/v1/liturgical_explanation/" + datePath(date);
+    path += "?preferences=" + urlEncode(preferencesJson());
+    return path;
 }
 
 String EstevaoClient::buildAssistantPath(const String &date) const {
@@ -172,6 +180,10 @@ EstevaoResponse EstevaoClient::requestAudio(const String &path, FS *fs, const St
         response.error = "Configure a API key do dispositivo";
         return response;
     }
+    if (!_config.baseUrl.startsWith("https://")) {
+        response.error = "A API deve usar HTTPS";
+        return response;
+    }
     if (fs == nullptr) {
         response.error = "Armazenamento de áudio indisponível";
         return response;
@@ -210,9 +222,16 @@ EstevaoResponse EstevaoClient::requestAudio(const String &path, FS *fs, const St
 
     int status = http.sendRequest("POST", &audioFile, audioFile.size());
     response.httpStatus = status;
-    if (status > 0) response.body = http.getString();
+    int contentLength = http.getSize();
+    if (status > 0 && contentLength > 0 && static_cast<size_t>(contentLength) > MAX_ASSISTANT_RESPONSE) {
+        response.error = "Resposta excede o limite do dispositivo";
+    } else if (status > 0) {
+        response.body = http.getString();
+    }
     if (status <= 0) response.error = http.errorToString(status);
-    else if (response.body.length() > MAX_ASSISTANT_RESPONSE) {
+    else if (response.error.length() > 0) {
+        response.body = "";
+    } else if (response.body.length() > MAX_ASSISTANT_RESPONSE) {
         response.body = "";
         response.error = "Resposta excede o limite do dispositivo";
     } else {
@@ -237,6 +256,7 @@ EstevaoResponse EstevaoClient::getExplanation(const String &date) {
 
 EstevaoResponse EstevaoClient::askText(const String &question, const String &date) {
     if (question.length() == 0) return {false, 400, false, "", "Pergunta vazia"};
+    if (!validDate(date)) return {false, 400, false, "", "Data inválida"};
 
     JsonDocument request;
     request["question"] = question;
@@ -252,6 +272,8 @@ EstevaoResponse EstevaoClient::askText(const String &question, const String &dat
 }
 
 EstevaoResponse EstevaoClient::askAudio(FS *fs, const String &audioPath, const String &date) {
+    if (!validDate(date)) return {false, 400, false, "", "Data inválida"};
+    if (audioPath.length() == 0) return {false, 400, false, "", "Áudio inválido"};
     return requestAudio(buildAssistantPath(date), fs, audioPath);
 }
 

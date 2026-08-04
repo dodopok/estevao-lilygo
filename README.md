@@ -3,21 +3,23 @@
 # Estêvão para LilyGO T-Embed CC1101
 
 Firmware customizado baseado no [Bruce](https://github.com/BruceDevices/firmware)
-para o LilyGO T-Embed CC1101. O aplicativo nativo **Estêvão** será um cliente
-HTTPS da API `api.caminhoanglicano.com.br`, com cache local e suporte a perguntas
-por texto e por voz.
+para o LilyGO T-Embed CC1101. O aplicativo nativo **Estêvão** é um cliente
+HTTPS da API `api.caminhoanglicano.com.br`, com cache local, integração direta
+com a OpenAI/MCP e suporte a perguntas por texto e por voz.
 
-Este repositório contém somente o firmware. O dispositivo nunca recebe chaves
-da OpenAI nem credenciais do MCP; essas integrações ficam no serviço autenticado
-que atende `POST /api/v1/assistant/ask`.
+Este repositório contém somente o firmware. Neste MVP de uso pessoal, a API key
+da OpenAI e o token do MCP são configurados no próprio dispositivo; a API key
+do Estêvão continua separada e é usada somente nas chamadas litúrgicas diretas.
+Para uma instalação multiusuário, a ponte opcional está descrita em
+[`docs/ASSISTANT_GATEWAY.md`](docs/ASSISTANT_GATEWAY.md).
 
 ## Estado do projeto
 
 - Bruce importado na raiz para preservar o build completo.
 - Ambiente alvo: `lilygo-t-embed-cc1101`.
 - O upstream do Bruce está documentado em [`docs/UPSTREAM.md`](docs/UPSTREAM.md).
-- O contrato esperado do serviço de IA está em [`docs/ASSISTANT_API.md`](docs/ASSISTANT_API.md).
-- O guia de implementação da gateway está em [`docs/ASSISTANT_GATEWAY.md`](docs/ASSISTANT_GATEWAY.md).
+- O contrato da integração OpenAI + MCP está em [`docs/ASSISTANT_API.md`](docs/ASSISTANT_API.md).
+- A evolução para uma ponte autenticada está em [`docs/ASSISTANT_GATEWAY.md`](docs/ASSISTANT_GATEWAY.md).
 
 ## Build
 

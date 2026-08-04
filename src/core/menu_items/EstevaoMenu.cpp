@@ -5,6 +5,7 @@
 #include "core/scrollableTextArea.h"
 #include "core/utils.h"
 #include "modules/estevao/estevao_client.h"
+#include "modules/estevao/openai_client.h"
 #include "modules/estevao/estevao_storage.h"
 #include "modules/others/mic.h"
 
@@ -56,6 +57,25 @@ String answerText(const String &payload) {
     if (answer.length() == 0) answer = variantText(doc["text"]);
     if (answer.length() == 0) answer = variantText(doc["output_text"]);
     if (answer.length() == 0 && doc["data"].is<JsonObject>()) answer = variantText(doc["data"]["answer"]);
+
+    if (answer.length() == 0 && doc["output"].is<JsonArray>()) {
+        for (JsonVariant item : doc["output"].as<JsonArray>()) {
+            if (!item.is<JsonObject>()) continue;
+
+            if (item["type"].as<String>() == "message") {
+                JsonArray contents = item["content"].as<JsonArray>();
+                for (JsonVariant content : contents) {
+                    String contentType = content["type"].as<String>();
+                    if (contentType == "output_text" || contentType == "text") {
+                        answer = variantText(content["text"]);
+                        if (answer.length() > 0) break;
+                    }
+                }
+            }
+            if (answer.length() == 0) answer = variantText(item["text"]);
+            if (answer.length() > 0) break;
+        }
+    }
     return answer.length() > 0 ? answer : payload;
 }
 
@@ -90,6 +110,8 @@ void addReadingSet(ScrollableTextArea &area, const char *title, JsonVariant read
 void EstevaoMenu::loadConfig() { EstevaoStorage::loadConfig(_config); }
 
 EstevaoClient EstevaoMenu::client() const { return EstevaoClient(_config); }
+
+OpenAIClient EstevaoMenu::assistantClient() const { return OpenAIClient(_config); }
 
 void EstevaoMenu::optionsMenu() {
     loadConfig();
@@ -152,7 +174,7 @@ bool EstevaoMenu::loadCalendar(bool refresh, String &date, String &payload, Stri
         }
     }
 
-    if (refresh && requestedDate.length() > 0 && _config.hasCredentials()) {
+    if (refresh && requestedDate.length() > 0 && _config.hasEstevaoCredentials()) {
         EstevaoResponse response = client().getCalendar(requestedDate);
         if (response.ok && response.body.length() > 0) {
             if (!EstevaoStorage::saveCalendar(requestedDate, response.body)) {
@@ -190,7 +212,7 @@ bool EstevaoMenu::loadExplanation(bool refresh, String &payload, String &error) 
     error = "";
 
     String date = EstevaoClient::todayDate();
-    if (refresh && date.length() > 0 && _config.hasCredentials()) {
+    if (refresh && date.length() > 0 && _config.hasEstevaoCredentials()) {
         EstevaoResponse response = client().getExplanation(date);
         if (response.ok && response.body.length() > 0) {
             EstevaoStorage::saveExplanation(response.body);
@@ -212,7 +234,7 @@ void EstevaoMenu::showText(const String &title, const String &text, size_t maxBy
 }
 
 void EstevaoMenu::showResponseError(const String &error) {
-    displayError(error.length() > 0 ? error : "Não foi possível consultar o Estêvão", true);
+    displayError(error.length() > 0 ? error : "Não foi possível concluir a consulta", true);
 }
 
 void EstevaoMenu::showToday() {
@@ -376,6 +398,10 @@ void EstevaoMenu::assistantMenu() {
 void EstevaoMenu::askByText() {
     String question = keyboard("", 160, "Pergunta ao Estevão:");
     if (question == "\x1B" || question.length() == 0) return;
+    if (!_config.hasAssistantCredentials()) {
+        showResponseError("Configure OpenAI e MCP em Configurações");
+        return;
+    }
 
     String date = EstevaoClient::todayDate();
     if (date.length() == 0) {
@@ -388,8 +414,8 @@ void EstevaoMenu::askByText() {
         return;
     }
 
-    displayInfo("Consultando o Estêvão...", false);
-    EstevaoResponse response = client().askText(question, date);
+    displayInfo("Consultando a IA...", false);
+    EstevaoResponse response = assistantClient().askText(question, date);
     if (!response.ok) {
         showResponseError(response.error);
         return;
@@ -404,8 +430,8 @@ void EstevaoMenu::askByVoice() {
     showResponseError("Este build não possui microfone configurado");
     return;
 #else
-    if (!_config.hasCredentials()) {
-        showResponseError("Configure a API key do dispositivo");
+    if (!_config.hasAssistantCredentials()) {
+        showResponseError("Configure OpenAI e MCP em Configurações");
         return;
     }
 
@@ -465,8 +491,8 @@ void EstevaoMenu::askByVoice() {
         return;
     }
 
-    displayInfo("Enviando pergunta...", false);
-    EstevaoResponse response = client().askAudio(&LittleFS, audioPath, date);
+    displayInfo("Transcrevendo e consultando IA...", false);
+    EstevaoResponse response = assistantClient().askAudio(&LittleFS, audioPath, date);
     LittleFS.remove(audioPath);
     if (!response.ok) {
         showResponseError(response.error);
@@ -489,10 +515,44 @@ void EstevaoMenu::showLastAnswer() {
 
 void EstevaoMenu::settingsMenu() {
     options = {
-        {String("API key: ") + (_config.apiKey.length() > 0 ? "configurada" : "ausente"), [this]() {
-             String value = keyboard(_config.apiKey, 180, "API key:", true);
+        {String("API Estêvão: ") + (_config.apiKey.length() > 0 ? "configurada" : "ausente"), [this]() {
+             String value = keyboard(_config.apiKey, 180, "API Estêvão:", true);
              if (value != "\x1B") {
                  _config.apiKey = value;
+                 EstevaoStorage::saveConfig(_config);
+             }
+             settingsMenu();
+         }},
+        {String("OpenAI: ") + (_config.openaiApiKey.length() > 0 ? "configurada" : "ausente"), [this]() {
+             String value = keyboard(_config.openaiApiKey, 220, "API OpenAI:", true);
+             if (value != "\x1B") {
+                 _config.openaiApiKey = value;
+                 EstevaoStorage::saveConfig(_config);
+             }
+             settingsMenu();
+         }},
+        {String("MCP URL: ") + (_config.mcpServerUrl.length() > 0 ? "configurada" : "ausente"), [this]() {
+             String value = keyboard(_config.mcpServerUrl, 220, "URL MCP:");
+             if (value != "\x1B" && value.length() > 0) {
+                 _config.mcpServerUrl = value;
+                 _config.mcpServerUrl.trim();
+                 while (_config.mcpServerUrl.endsWith("/")) _config.mcpServerUrl.remove(_config.mcpServerUrl.length() - 1);
+                 EstevaoStorage::saveConfig(_config);
+             }
+             settingsMenu();
+         }},
+        {String("MCP token: ") + (_config.mcpToken.length() > 0 ? "configurado" : "ausente"), [this]() {
+             String value = keyboard(_config.mcpToken, 220, "Token MCP:", true);
+             if (value != "\x1B") {
+                 _config.mcpToken = value;
+                 EstevaoStorage::saveConfig(_config);
+             }
+             settingsMenu();
+         }},
+        {String("Modelo IA: ") + _config.openaiModel, [this]() {
+             String value = keyboard(_config.openaiModel, 64, "Modelo OpenAI:");
+             if (value != "\x1B" && value.length() > 0) {
+                 _config.openaiModel = value;
                  EstevaoStorage::saveConfig(_config);
              }
              settingsMenu();
@@ -519,7 +579,7 @@ void EstevaoMenu::settingsMenu() {
              settingsMenu();
          }},
         {"HTTPS: CA embutida", []() {
-             displayInfo("CA incluida no firmware\nOverride opcional: /estevao/ca.pem", true);
+             displayInfo("CA para Estêvão e OpenAI\nOverride: /estevao/ca.pem", true);
          }},
         {"Salvar e voltar", [this]() {
              EstevaoStorage::saveConfig(_config);

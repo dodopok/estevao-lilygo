@@ -34,6 +34,11 @@ bool loadConfig(EstevaoConfig &config) {
 
     config.baseUrl = readConfigString(doc, "base_url", config.baseUrl);
     config.apiKey = readConfigString(doc, "api_key", config.apiKey);
+    config.openaiBaseUrl = readConfigString(doc, "openai_base_url", config.openaiBaseUrl);
+    config.openaiApiKey = readConfigString(doc, "openai_api_key", config.openaiApiKey);
+    config.openaiModel = readConfigString(doc, "openai_model", config.openaiModel);
+    config.mcpServerUrl = readConfigString(doc, "mcp_server_url", config.mcpServerUrl);
+    config.mcpToken = readConfigString(doc, "mcp_token", config.mcpToken);
     config.prayerBookCode = readConfigString(doc, "prayer_book_code", config.prayerBookCode);
     config.bibleVersion = readConfigString(doc, "bible_version", config.bibleVersion);
     config.readingType = readConfigString(doc, "reading_type", config.readingType);
@@ -47,6 +52,12 @@ bool loadConfig(EstevaoConfig &config) {
 
     config.baseUrl.trim();
     while (config.baseUrl.endsWith("/")) config.baseUrl.remove(config.baseUrl.length() - 1);
+    config.openaiBaseUrl.trim();
+    while (config.openaiBaseUrl.endsWith("/")) config.openaiBaseUrl.remove(config.openaiBaseUrl.length() - 1);
+    config.openaiModel.trim();
+    config.mcpServerUrl.trim();
+    while (config.mcpServerUrl.endsWith("/")) config.mcpServerUrl.remove(config.mcpServerUrl.length() - 1);
+    config.mcpToken.trim();
     return true;
 }
 
@@ -59,6 +70,11 @@ bool saveConfig(const EstevaoConfig &config) {
     JsonDocument doc;
     doc["base_url"] = config.baseUrl;
     doc["api_key"] = config.apiKey;
+    doc["openai_base_url"] = config.openaiBaseUrl;
+    doc["openai_api_key"] = config.openaiApiKey;
+    doc["openai_model"] = config.openaiModel;
+    doc["mcp_server_url"] = config.mcpServerUrl;
+    doc["mcp_token"] = config.mcpToken;
     doc["prayer_book_code"] = config.prayerBookCode;
     doc["bible_version"] = config.bibleVersion;
     doc["reading_type"] = config.readingType;
@@ -111,6 +127,6 @@ bool loadExplanation(String &payload) { return loadText(EXPLANATION_PATH, payloa
 
 bool saveAnswer(const String &payload) { return saveText(ANSWER_PATH, payload); }
 
-bool loadAnswer(String &payload) { return loadText(ANSWER_PATH, payload, 24 * 1024); }
+bool loadAnswer(String &payload) { return loadText(ANSWER_PATH, payload, 64 * 1024); }
 
 } // namespace EstevaoStorage

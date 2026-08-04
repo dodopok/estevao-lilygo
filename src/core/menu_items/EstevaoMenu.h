@@ -5,6 +5,7 @@
 
 #include "modules/estevao/estevao_client.h"
 #include "modules/estevao/estevao_models.h"
+#include "modules/estevao/openai_client.h"
 
 class EstevaoMenu : public MenuItemInterface {
 public:
@@ -24,6 +25,7 @@ private:
 
     void loadConfig();
     EstevaoClient client() const;
+    OpenAIClient assistantClient() const;
 
     void showToday();
     void showCollect();

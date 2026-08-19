@@ -37,6 +37,26 @@ String documentField(JsonDocument &document, const char *first, const char *seco
     return value;
 }
 
+JsonArray calendarCelebrations(JsonDocument &document) {
+    JsonArray celebrations = document["celebrations"].as<JsonArray>();
+    if (!celebrations.isNull() && celebrations.size() > 0) return celebrations;
+
+    // Keep compatibility with the original proposed API contract.
+    JsonArray commemorations = document["commemorations"].as<JsonArray>();
+    return !commemorations.isNull() && commemorations.size() > 0 ? commemorations : celebrations;
+}
+
+bool sameCalendarDate(const String &requestedDate, const String &documentDate) {
+    if (requestedDate == documentDate) return true;
+    if (requestedDate.length() != 10 || documentDate.length() != 10) return false;
+    if (requestedDate.charAt(4) != '-' || requestedDate.charAt(7) != '-') return false;
+    if (documentDate.charAt(2) != '/' || documentDate.charAt(5) != '/') return false;
+
+    String normalizedDocumentDate = documentDate.substring(6, 10) + "-" + documentDate.substring(3, 5) + "-" +
+                                    documentDate.substring(0, 2);
+    return requestedDate == normalizedDocumentDate;
+}
+
 void addLabeledLine(ScrollableTextArea &area, const String &label, const String &value) {
     if (value.length() > 0) area.addLine(label + ": " + value);
 }
@@ -252,7 +272,9 @@ void EstevaoMenu::showToday() {
 
     ScrollableTextArea area("ESTÊVÃO | HOJE");
     String documentDate = documentField(doc, "date");
-    addLabeledLine(area, "Data", documentDate + (date != documentDate ? " (cache)" : ""));
+    String dateLabel = documentDate;
+    if (documentDate.length() > 0 && !sameCalendarDate(date, documentDate)) dateLabel += " (cache)";
+    addLabeledLine(area, "Data", dateLabel);
     addLabeledLine(area, "Dia", documentField(doc, "day_of_week"));
     addLabeledLine(area, "Estação", documentField(doc, "liturgical_season", "season"));
     addLabeledLine(area, "Cor", documentField(doc, "liturgical_color", "color"));
@@ -267,8 +289,8 @@ void EstevaoMenu::showToday() {
     if (celebrationName.length() == 0) celebrationName = variantText(celebration);
     addLabeledLine(area, "Celebração", celebrationName);
 
-    JsonArray commemorations = doc["commemorations"].as<JsonArray>();
-    if (!commemorations.isNull()) addLabeledLine(area, "Comemorações", String(commemorations.size()));
+    JsonArray celebrations = calendarCelebrations(doc);
+    if (!celebrations.isNull()) addLabeledLine(area, "Comemorações", String(celebrations.size()));
     else if (!doc["saint"].isNull()) addLabeledLine(area, "Santo", fieldText(doc["saint"], "name", "title"));
 
     area.addLine("");
@@ -328,14 +350,14 @@ void EstevaoMenu::showCommemorations() {
     }
 
     ScrollableTextArea area("COMEMORAÇÕES | " + date);
-    JsonArray commemorations = doc["commemorations"].as<JsonArray>();
-    if (!commemorations.isNull() && commemorations.size() > 0) {
-        for (JsonVariant commemoration : commemorations) {
-            String name = fieldText(commemoration, "name", "title");
-            area.addLine(name.length() > 0 ? name : variantText(commemoration));
-            addLabeledLine(area, "Tipo", fieldText(commemoration, "type"));
-            addLabeledLine(area, "Cor", fieldText(commemoration, "color"));
-            addLabeledLine(area, "Grau", fieldText(commemoration, "rank"));
+    JsonArray celebrations = calendarCelebrations(doc);
+    if (!celebrations.isNull() && celebrations.size() > 0) {
+        for (JsonVariant celebration : celebrations) {
+            String name = fieldText(celebration, "name", "title");
+            area.addLine(name.length() > 0 ? name : variantText(celebration));
+            addLabeledLine(area, "Tipo", fieldText(celebration, "type"));
+            addLabeledLine(area, "Cor", fieldText(celebration, "color"));
+            addLabeledLine(area, "Grau", fieldText(celebration, "rank"));
             area.addLine("");
         }
     } else {
@@ -370,7 +392,13 @@ void EstevaoMenu::showReadingSet(const char *title, const char *jsonKey) {
     }
 
     ScrollableTextArea area(String(title) + " | " + date);
-    addReadingSet(area, title, doc[jsonKey]);
+    JsonVariant readings = doc[jsonKey];
+    if (readings.isNull() &&
+        (String(jsonKey) == "morning_readings" || String(jsonKey) == "evening_readings")) {
+        // LOC 2015 may not expose a separate office set; use the day's readings.
+        readings = doc["readings"];
+    }
+    addReadingSet(area, title, readings);
     if (area.getMaxLines() == 0) area.addLine("Nenhuma leitura disponível.");
     area.show(true);
 }

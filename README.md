@@ -43,6 +43,16 @@ pio run -e lilygo-t-embed-cc1101 -t upload
 
 Antes do primeiro flash, salve o firmware oficial do Bruce para rollback.
 
+## Pull requests
+
+O título segue Conventional Commits em inglês, como os commits
+(`feat(estevao): …`, `fix: …`), e a descrição segue o modelo em
+`.github/pull_request_template.md` (por quê, o que muda, riscos, publicação,
+como desfazer, como testar, telas, checklist). O GitHub só preenche o modelo na
+tela web: quem abre PR pela API ou pela linha de comando copia as seções e
+preenche cada uma, com "Nada." onde não se aplica. Esse modelo substitui o do
+Bruce: numa sincronização com o upstream, mantenha a versão do Estêvão.
+
 ## Licença e atribuição
 
 O código importado do Bruce permanece sob AGPL-3.0 e suas atribuições de
